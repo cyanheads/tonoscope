@@ -30,9 +30,19 @@ export const BAR_SECONDS = 6.4;
 
 const MELODY_SLOTS = [0.9, 1.6, 2.5, 3.3, 4.2, 5.0, 5.7] as const;
 
+/** Seconds from a (re)start to the next bar. */
+const LEAD_IN = 0.35;
+
+/**
+ * A longer pause between updates (a hidden tab, a stalled page) skips ahead: the missed notes are
+ * dropped and a fresh bar begins, instead of every missed bar sounding in one frame.
+ */
+const MAX_GAP = 1;
+
 export class Composer {
   private nextBarAt = 0;
   private barIndex = 0;
+  private lastUpdate = 0;
   private queue: Scheduled[] = [];
   private readonly random: () => number;
 
@@ -42,13 +52,14 @@ export class Composer {
 
   /** Restart the piece so its first bar begins shortly after `now`. */
   reset(now: number): void {
-    this.nextBarAt = now + 0.35;
     this.barIndex = 0;
-    this.queue = [];
+    this.restartAt(now);
   }
 
   /** Notes whose start time has arrived, in start order. */
   update(now: number): ComposedNote[] {
+    if (now - this.lastUpdate > MAX_GAP) this.restartAt(now);
+    this.lastUpdate = now;
     while (now >= this.nextBarAt) {
       this.scheduleBar(this.nextBarAt);
       this.nextBarAt += BAR_SECONDS;
@@ -60,6 +71,13 @@ export class Composer {
       return false;
     });
     return due;
+  }
+
+  /** Drop whatever is queued and begin the next bar shortly after `now`, keeping the progression. */
+  private restartAt(now: number): void {
+    this.nextBarAt = now + LEAD_IN;
+    this.lastUpdate = now;
+    this.queue = [];
   }
 
   private scheduleBar(start: number): void {

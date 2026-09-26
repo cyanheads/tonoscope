@@ -1,5 +1,6 @@
 /**
- * @fileoverview The Listen-mode composer: deterministic under a seeded source, bar-shaped, in range.
+ * @fileoverview The Listen-mode composer: deterministic under a seeded source, bar-shaped, in range,
+ * and unhurried after a pause.
  * @module tests/music/composer
  */
 
@@ -36,6 +37,17 @@ describe('Composer', () => {
       const gap = (held[bar]?.at ?? 0) - (held[bar - 1]?.at ?? 0);
       expect(gap).toBeCloseTo(BAR_SECONDS, 1);
     }
+  });
+
+  it('skips ahead after a long pause instead of sounding every missed bar at once', () => {
+    const composer = new Composer(seeded(7));
+    perform(composer, BAR_SECONDS * 1.5);
+    const back = BAR_SECONDS * 1.5 + 90;
+    expect(composer.update(back)).toEqual([]);
+    const resumed: ComposedNote[] = [];
+    for (let t = back; t <= back + 1; t += 1 / 60) resumed.push(...composer.update(t));
+    expect(resumed).toHaveLength(1);
+    expect(resumed[0]?.hold).toBeGreaterThan(0);
   });
 
   it('keeps every note inside the playable range', () => {
