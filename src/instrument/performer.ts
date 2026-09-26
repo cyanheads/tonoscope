@@ -13,6 +13,8 @@ export interface PerformerHooks {
   /** Performance clock in seconds. */
   readonly now: () => number;
   readonly range: () => PitchRange;
+  /** Whether the player has begun; until then the title page is up and the keys play nothing. */
+  readonly started: () => boolean;
   /** Called on every note the player starts (not the composer or voice). */
   readonly onPlay: () => void;
 }
@@ -22,7 +24,15 @@ interface Press {
   degree: number;
   x: number;
   y: number;
+  /** Took part in a pinch: turns and zooms only, and plays nothing until it lifts. */
+  pinched: boolean;
 }
+
+/**
+ * Wheel deltas in lines (Firefox's mouse wheel, usually 3 a notch) become pixels at this height, so
+ * a notch zooms about as far as the ~100 px other browsers report.
+ */
+const WHEEL_LINE_PX = 40;
 
 export interface Stir {
   /** Pointer position in normalized device coordinates (-1..1, y up). */
@@ -129,7 +139,13 @@ export class Performer {
       return;
     }
     if (event.button !== 0) return;
-    const press: Press = { noteId: null, degree: -1, x: event.clientX, y: event.clientY };
+    const press: Press = {
+      noteId: null,
+      degree: -1,
+      x: event.clientX,
+      y: event.clientY,
+      pinched: this.pinch !== null,
+    };
     this.presses.set(event.pointerId, press);
 
     if (event.pointerType === 'touch' && this.presses.size === 2) {
@@ -137,6 +153,7 @@ export class Performer {
       for (const p of this.presses.values()) {
         if (p.noteId !== null) this.instrument.noteOff(now, p.noteId);
         p.noteId = null;
+        p.pinched = true;
       }
       const [a, b] = [...this.presses.values()];
       if (a && b) {
@@ -148,7 +165,7 @@ export class Performer {
       }
       return;
     }
-    if (!this.pinch) this.strike(press, 1);
+    if (!press.pinched) this.strike(press, 1);
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
@@ -176,6 +193,7 @@ export class Performer {
       this.pinch = { distance, x, y };
       return;
     }
+    if (press.pinched) return;
 
     const rect = this.stage.getBoundingClientRect();
     const degree = degreeAtX((event.clientX - rect.left) / rect.width, this.hooks.range());
@@ -196,11 +214,24 @@ export class Performer {
 
   private readonly onWheel = (event: WheelEvent): void => {
     event.preventDefault();
-    this.camera.zoom(Math.exp(event.deltaY * 0.0012));
+    const pixels =
+      event.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? event.deltaY * WHEEL_LINE_PX
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? event.deltaY * this.stage.clientHeight
+          : event.deltaY;
+    /**
+     * A trackpad pinch arrives as Ctrl-wheel events of a few pixels each: follow the fingers
+     * closely, but cap each step so Ctrl with a mouse wheel does not leap.
+     */
+    const rate = event.ctrlKey ? 0.01 : 0.0012;
+    this.camera.zoom(Math.exp(Math.min(0.25, Math.max(-0.25, pixels * rate))));
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
-    if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (!this.hooks.started() || event.repeat || event.metaKey || event.ctrlKey || event.altKey) {
+      return;
+    }
     const degree = KEY_DEGREES.get(event.code);
     if (degree === undefined || this.keys.has(event.code)) return;
     if (event.target instanceof HTMLElement && event.target.closest('.about')) return;

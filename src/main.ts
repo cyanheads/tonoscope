@@ -8,7 +8,7 @@ import '@fontsource/im-fell-english/400.css';
 import '@fontsource/im-fell-english/400-italic.css';
 import './ui/styles.css';
 
-import { AudioEngine, Microphone } from './audio/index.ts';
+import { AudioEngine, Microphone, setAudioSession } from './audio/index.ts';
 import {
   DEFAULT_LOOK,
   DEFAULT_PHYSICS,
@@ -111,6 +111,10 @@ async function boot(): Promise<void> {
   let captureRequested = false;
   let started = false;
   let firstPlayHintCleared = false;
+  /** Bumped by every change of way, so a Sing request that is overtaken knows it. */
+  let wayRequest = 0;
+  /** When the vessel last changed, until its grains land. */
+  let switchedAt: number | null = null;
 
   const instrument = new Instrument();
   const composer = new Composer();
@@ -159,6 +163,7 @@ async function boot(): Promise<void> {
   const performer = new Performer(stage, instrument, camera, {
     now: clock,
     range: () => pitchRangeFor(window.innerWidth),
+    started: () => started,
     onPlay: () => {
       if (way === 'listen' && started) void setWay('play');
       if (!firstPlayHintCleared && started) {
@@ -168,8 +173,11 @@ async function boot(): Promise<void> {
     },
   });
 
+  /** The devicePixelRatio the canvas was last sized for. */
+  let density = 0;
   const resize = (): void => {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    density = window.devicePixelRatio || 1;
+    const dpr = Math.min(density, 2);
     stage.width = Math.max(1, Math.floor(stage.clientWidth * dpr));
     stage.height = Math.max(1, Math.floor(stage.clientHeight * dpr));
     renderer.resize(stage.width, stage.height);
@@ -178,12 +186,23 @@ async function boot(): Promise<void> {
   window.addEventListener('resize', resize);
   resize();
 
+  /** Sing needs the microphone; every other way plays through the iPhone's silent switch. */
+  function syncAudioSession(): void {
+    setAudioSession(way === 'sing' ? 'play-and-record' : 'playback');
+  }
+
   function ensureAudio(): AudioEngine {
     if (!audio) {
+      syncAudioSession();
       audio = AudioEngine.create();
       instrument.attachAudio(audio);
     }
     return audio;
+  }
+
+  /** Restart the audio clock where it should run: with sound on, or while singing (pitch needs it). */
+  function wakeAudio(): void {
+    if (soundOn || way === 'sing') audio?.wake();
   }
 
   function begin(withSound: boolean): void {
@@ -219,38 +238,54 @@ async function boot(): Promise<void> {
     const engine = ensureAudio();
     soundOn = !soundOn;
     engine.setMuted(!soundOn);
+    if (soundOn) engine.wake();
     hud.setSound(soundOn);
   }
 
   async function setWay(next: Way): Promise<void> {
+    if (next === 'sing' && way === 'sing') return; // already singing, or asking for the microphone
+    wayRequest += 1;
+    const request = wayRequest;
     const now = clock();
-    if (way === 'listen' && next !== 'listen') instrument.releaseAll(now, 'composer');
-    if (way === 'sing' && next !== 'sing') {
+    const previous = way;
+    way = next;
+    hud.setWay(next);
+    if (previous === 'listen' && next !== 'listen') instrument.releaseAll(now, 'composer');
+    if (previous === 'sing' && next !== 'sing') {
       microphone?.close();
       microphone = null;
+      syncAudioSession();
       instrument.releaseAll(now, 'voice');
       voice = null;
     }
-    way = next;
-    hud.setWay(next);
     if (next === 'listen') composer.reset(now);
-    if (next === 'sing') {
-      const engine = ensureAudio();
-      if (!soundOn) engine.setMuted(true);
-      const result = await Microphone.open(engine.ctx);
-      if (!result.ok) {
-        hud.showHint(
-          result.reason === 'denied'
-            ? "The microphone is blocked. Allow it in this site's settings to sing."
-            : 'No microphone is available.',
-          7,
-        );
-        await setWay('play');
-        return;
+    if (next !== 'sing') return;
+
+    const engine = ensureAudio();
+    if (!soundOn) engine.setMuted(true);
+    engine.wake();
+    syncAudioSession();
+    const result = await Microphone.open(engine.ctx);
+    if (request !== wayRequest) {
+      // The player chose another way while the permission prompt was up.
+      if (result.ok) {
+        result.microphone.close();
+        syncAudioSession();
       }
-      microphone = result.microphone;
-      hud.showHint('Sing or hum a long, steady note and watch it take shape.', 7);
+      return;
     }
+    if (!result.ok) {
+      hud.showHint(
+        result.reason === 'denied'
+          ? "The microphone is blocked. Allow it in this site's settings to sing."
+          : 'No microphone is available.',
+        7,
+      );
+      await setWay('play');
+      return;
+    }
+    microphone = result.microphone;
+    hud.showHint('Sing or hum a long, steady note and watch it take shape.', 7);
   }
 
   function setVessel(index: number): void {
@@ -258,6 +293,7 @@ async function boot(): Promise<void> {
     vesselIndex = index;
     generation += 1;
     morph = 0;
+    switchedAt = clock();
     const vessel = vesselAt(index);
     camera.setFraming(vessel.framing);
     hud.setVessel(index);
@@ -273,6 +309,28 @@ async function boot(): Promise<void> {
       void setWay(way === 'listen' ? 'play' : 'listen');
     }
   });
+
+  /**
+   * Frames stop while the page is hidden, and with them every timed release, so nothing may keep
+   * sounding: notes are released, the microphone closes, and the audio clock sleeps.
+   */
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      wakeAudio();
+      return;
+    }
+    if (way === 'sing') void setWay('play');
+    instrument.releaseAll(clock());
+    audio?.sleep();
+  });
+
+  /**
+   * iOS can leave audio interrupted after a call or a screen lock until a gesture restarts it. A
+   * touch counts as a gesture on release, a mouse button or key on press.
+   */
+  for (const type of ['pointerdown', 'pointerup', 'keydown'] as const) {
+    window.addEventListener(type, wakeAudio);
+  }
 
   function listenToVoice(now: number): void {
     if (!microphone) return;
@@ -307,6 +365,26 @@ async function boot(): Promise<void> {
       instrument.noteOff(now, voice.id);
       voice = null;
     }
+  }
+
+  /**
+   * After a resonator switch the grains land as a blank sheet under a caption naming the last
+   * note's figure. In Play, with nothing sounding (by the figure strip's measure) and nothing
+   * played since the switch, that note sounds again, silently, so its figure forms. Listen and
+   * Sing keep the vessel busy themselves.
+   */
+  function refigure(now: number, since: number, excitations: readonly Excitation[]): void {
+    const latest = instrument.lastPlayed;
+    if (way !== 'play' || !latest || latest.at >= since) return;
+    if (excitations.some((e) => e.amplitude > 0.06)) return;
+    instrument.noteOn(now, latest.degree, {
+      velocity: 0.75,
+      pan: 0,
+      bowed: true,
+      source: latest.source,
+      silent: true,
+      holdFor: 1.6,
+    });
   }
 
   let lastCaptionKey = '';
@@ -427,10 +505,16 @@ async function boot(): Promise<void> {
 
     const vessel = vesselAt(vesselIndex);
     const excitations = instrument.excitations(now);
+    if (switchedAt !== null && morph === 1) {
+      refigure(now, switchedAt, excitations);
+      switchedAt = null;
+    }
     const slotCount = packSlots(vessel, excitations, slots, 0);
     updateTint(excitations, dt);
     updateStir(vessel, dt);
 
+    // A move to a display of another density changes devicePixelRatio without a resize event.
+    if ((window.devicePixelRatio || 1) !== density) resize();
     const view = camera.update(dt, stage.width / stage.height);
     const encoder = device.createCommandEncoder({ label: 'frame' });
     particles.encode(encoder, {
