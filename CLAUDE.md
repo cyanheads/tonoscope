@@ -42,6 +42,7 @@ Input or composer → `Instrument` notes → `packSlots` (≤ 8 slots) → `simu
 - **Uniform layouts are hand-packed.** `SimParams` offsets in `particle-system.ts#encode` and `View`/`Composite` in `renderer.ts` must match the WGSL structs field for field (vec4 granularity).
 - **WGSL constants are injected**, not declared: `BESSEL_SAMPLES`, `BESSEL_X_MAX`, `LEGENDRE_SAMPLES`, `MAX_SLOTS`, `RIM_FRACTION` come from TS headers. `target` and other WGSL reserved words fail silently at pipeline creation — watch the console for `[tonoscope] GPU error`.
 - **Audio starts only inside a user gesture** (`AudioEngine.create()` is synchronous and never awaits `resume()`; awaiting it stalls the UI where no output device exists).
+- **The audio session follows the way.** `syncAudioSession()` in main.ts sets `play-and-record` in Sing and `playback` otherwise; switching away from `play-and-record` ends a live microphone track. Anything timed by the frame loop stops in a hidden tab, so `visibilitychange` releases notes and sleeps the engine.
 - **Degree order = complexity order** in every vessel; tests enforce ascending plate wavenumber. Adding a mode means keeping that property.
 - **Copy is sentence case, plain, treatise-flavored.** No all-caps labels; figure captions read `Fig. N. <pitch>: <mode description>.` Run a `writing-humanizer` pass on substantial copy changes.
 - **The interface stays colorless** except `--note`, which follows the last note's Scriabin color.
