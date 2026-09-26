@@ -1,6 +1,6 @@
 /**
  * @fileoverview Note lifecycle shared by every way of playing (pointer, keys, the composer, the
- * voice). Each note drives a glass voice when audio is on, and always drives the vessel: its
+ * voice). Each note drives a glass voice when sound is on, and always drives the vessel: its
  * visual envelope (a strike that decays into a bowed sustain while held) is what the grains feel.
  * @module instrument/instrument
  */
@@ -73,7 +73,7 @@ export class Instrument {
   noteOn(now: number, degree: number, options: NoteOptions): number {
     const note = noteAt(degree);
     const voice =
-      this.audio && !options.silent
+      this.audio && !this.audio.isMuted && !options.silent
         ? this.audio.play({
             frequency: note.frequency,
             velocity: options.velocity,

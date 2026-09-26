@@ -1,11 +1,35 @@
 /**
  * @fileoverview The sound of the instrument: a voice bus feeding a generated-impulse hall reverb
  * and a filtered ping-pong delay, a quiet D drone underneath, and a gentle master compressor.
- * Everything is synthesized; nothing is loaded.
+ * Everything is synthesized; nothing is loaded. Voices are capped, and the whole engine sleeps
+ * while the page is hidden.
  * @module audio/audio-engine
  */
 
 import { GlassVoice, type VoiceOptions } from './glass-voice.ts';
+
+/**
+ * Most voices sounding at once. Each is up to 13 oscillators, so a fast run or a mashed keyboard
+ * would otherwise pile graphs up faster than they ring out and crackle on phones. Listen's own
+ * texture, counted until each voice leaves the graph, has a median of 6 and a 99th percentile
+ * of 10, so the cap all but never touches it, and the oldest released voice goes first.
+ */
+export const MAX_VOICES = 12;
+
+/** Just what voice stealing needs to know about a voice. */
+export interface Stealable {
+  /** No longer held: struck, or ringing out after release. */
+  readonly released: boolean;
+}
+
+/**
+ * The voice to cut so one more fits under `cap`, or undefined while there is room. `live` is in
+ * start order; the oldest released voice goes first (its tail is already fading), else the oldest.
+ */
+export function voiceToSteal<V extends Stealable>(live: readonly V[], cap: number): V | undefined {
+  if (live.length < cap) return undefined;
+  return live.find((voice) => voice.released) ?? live[0];
+}
 
 /** Stereo hall impulse: decaying noise that darkens as it fades, with a short pre-delay. */
 function createImpulse(ctx: AudioContext, seconds: number): AudioBuffer {
@@ -32,7 +56,11 @@ export class AudioEngine {
   private readonly voices: GainNode;
   private readonly master: GainNode;
   private readonly droneGain: GainNode;
+  /** Voices still in the graph, in start order. */
+  private live: GlassVoice[] = [];
   private muted = false;
+  private asleep = false;
+  private sleepTimer = 0;
 
   private constructor(ctx: AudioContext) {
     this.ctx = ctx;
@@ -90,13 +118,47 @@ export class AudioEngine {
 
   setMuted(muted: boolean): void {
     this.muted = muted;
-    const now = this.ctx.currentTime;
-    this.master.gain.cancelScheduledValues(now);
-    this.master.gain.setTargetAtTime(muted ? 0 : 0.9, now, 0.08);
+    this.fadeMaster(0.08);
+  }
+
+  /** Fade out and stop the audio clock, drone and all, while the page is hidden. */
+  sleep(): void {
+    if (this.asleep) return;
+    this.asleep = true;
+    this.fadeMaster(0.02);
+    this.sleepTimer = window.setTimeout(() => void this.ctx.suspend(), 150);
+  }
+
+  /**
+   * Undo `sleep()`, and restart a context the browser suspended or iOS interrupted (a call, the
+   * screen locking). iOS may honor the restart only inside a user gesture, so input calls this too.
+   */
+  wake(): void {
+    if (this.asleep) {
+      this.asleep = false;
+      window.clearTimeout(this.sleepTimer);
+      this.fadeMaster(0.08);
+    }
+    // Outside a gesture the browser may refuse; the next gesture asks again.
+    if (this.ctx.state !== 'running') this.ctx.resume().catch(() => undefined);
   }
 
   play(options: VoiceOptions): GlassVoice {
-    return new GlassVoice(this.ctx, this.voices, options);
+    this.live = this.live.filter((voice) => !voice.ended);
+    const stolen = voiceToSteal(this.live, MAX_VOICES);
+    if (stolen) {
+      stolen.steal();
+      this.live = this.live.filter((voice) => voice !== stolen);
+    }
+    const voice = new GlassVoice(this.ctx, this.voices, options);
+    this.live.push(voice);
+    return voice;
+  }
+
+  private fadeMaster(timeConstant: number): void {
+    const now = this.ctx.currentTime;
+    this.master.gain.cancelScheduledValues(now);
+    this.master.gain.setTargetAtTime(this.muted || this.asleep ? 0 : 0.9, now, timeConstant);
   }
 
   /** A D2/A2 pad an octave below the playable range, barely there, breathing slowly. */

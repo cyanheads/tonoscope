@@ -33,16 +33,22 @@ export interface VoiceOptions {
   readonly bowed: boolean;
 }
 
+/** Held: the bowed layer sustains. Released: ringing out. Ended: out of the audio graph. */
+type VoiceState = 'held' | 'released' | 'ended';
+
 export class GlassVoice {
   private readonly ctx: AudioContext;
   private readonly output: GainNode;
   private readonly bow: GainNode | null;
+  /** Every source, so a stolen voice can stop them all at once. */
+  private readonly sources: OscillatorNode[] = [];
   /** Bowed-layer sources, stopped on release; struck partials stop themselves. */
   private readonly sustained: OscillatorNode[] = [];
-  private released = false;
+  private state: VoiceState;
 
   constructor(ctx: AudioContext, destination: AudioNode, options: VoiceOptions) {
     this.ctx = ctx;
+    this.state = options.bowed ? 'held' : 'released';
     const now = ctx.currentTime;
     const { frequency, velocity } = options;
     const pitchScale = Math.min(1.6, Math.max(0.45, (220 / frequency) ** 0.45));
@@ -69,6 +75,7 @@ export class GlassVoice {
       osc.connect(amp).connect(tone);
       osc.start(now);
       osc.stop(now + decay * 7 + 0.1);
+      this.sources.push(osc);
       longest = Math.max(longest, decay * 7);
     }
 
@@ -97,6 +104,7 @@ export class GlassVoice {
       vibrato.start(now);
       tremolo.start(now);
       this.sustained.push(vibrato, tremolo);
+      this.sources.push(...this.sustained);
       this.bow.connect(tone);
     } else {
       this.bow = null;
@@ -104,11 +112,20 @@ export class GlassVoice {
     }
   }
 
+  /** No longer held: struck, or released and ringing out. */
+  get released(): boolean {
+    return this.state !== 'held';
+  }
+
+  /** Out of the audio graph; it costs nothing more. */
+  get ended(): boolean {
+    return this.state === 'ended';
+  }
+
   /** Let the bowed layer fade; the struck partials ring out on their own. */
   release(): void {
-    if (this.released) return;
-    this.released = true;
-    if (!this.bow) return;
+    if (this.state !== 'held' || !this.bow) return;
+    this.state = 'released';
     const now = this.ctx.currentTime;
     this.bow.gain.cancelScheduledValues(now);
     this.bow.gain.setTargetAtTime(0, now, 0.45);
@@ -116,7 +133,19 @@ export class GlassVoice {
     window.setTimeout(() => this.disconnect(), 4000);
   }
 
+  /** Cut the voice short to make room for another: gone in a tenth of a second, without a click. */
+  steal(): void {
+    if (this.state === 'ended') return;
+    this.state = 'released';
+    const now = this.ctx.currentTime;
+    this.output.gain.cancelScheduledValues(now);
+    this.output.gain.setTargetAtTime(0, now, 0.015);
+    for (const osc of this.sources) osc.stop(now + 0.1);
+    window.setTimeout(() => this.disconnect(), 150);
+  }
+
   private disconnect(): void {
+    this.state = 'ended';
     this.output.disconnect();
   }
 }
