@@ -11,6 +11,9 @@
 
 </div>
 
+> [!NOTE]
+> **Developer note:** Tonoscope is an experiment in Claude Opus 5.5's one-shot ability. From one open-ended prompt asking for the most "magical", futuristic-feeling visual a browser can show, Claude designed and built the whole instrument (physics, WGSL shaders, synthesized audio, interface, tests and docs) in about an hour, with no human edits or feedback. That build is tagged [`v0.1.0`](https://github.com/cyanheads/tonoscope/tree/v0.1.0). The [`v0.1.1`](https://github.com/cyanheads/tonoscope/releases/tag/v0.1.1) release marks the one-shot snapshot, adding a fix from the same session, hosting config, a link to the source and the license.
+
 ---
 
 ![The title page: a plate figure glowing behind the title](docs/images/title.jpg)
@@ -123,4 +126,4 @@ No environment variables. One URL parameter:
 
 ## License
 
-Private. All rights reserved.
+[Apache-2.0](./LICENSE). The IM Fell English font the site ships, from `@fontsource/im-fell-english`, is under the SIL Open Font License 1.1.

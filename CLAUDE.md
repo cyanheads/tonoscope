@@ -63,8 +63,8 @@ Input or composer → `Instrument` notes → `packSlots` (≤ 8 slots) → `simu
 | "grains feel sluggish / too jumpy" | `DEFAULT_PHYSICS` in `src/gpu/particle-system.ts`; onset jolt in `Instrument.agitation` |
 | "change the scale / key" | `src/music/scale.ts` (`LYDIAN_STEPS`, `TONIC_MIDI`), composer progression, key-map tests |
 | "take screenshots", "show me" | `bun run dev` then `bun run snapshot` |
-| "deploy it", "ship it live", "push to the site" | `bun run deploy`, then verify https://tonoscope.caseyjhand.com returns the new asset hashes and run `bun run snapshot --url https://tonoscope.caseyjhand.com/` (headless reaches it because a zone WAF rule skips bot protection for this host; without it, headless gets a Cloudflare challenge page) |
+| "deploy it", "ship it live", "push to the site" | `bun run deploy`, then verify https://tonoscope.caseyjhand.com returns the new asset hashes and run `bun run snapshot --url https://tonoscope.caseyjhand.com/` |
 
 ## Commit stance
 
-Private, Claude-maintained repo: commit and push verified work as it lands once `bun run check` is green. Versioned releases add a `changelog/` entry and rebuild `CHANGELOG.md`; the site updates only when `bun run deploy` runs — pushing to GitHub deploys nothing.
+Public (Apache-2.0), Claude-maintained repo: commit and push verified work as it lands once `bun run check` is green. Everything tracked is public, so hosting-account settings, secrets and local paths stay out of it. Versioned releases add a `changelog/` entry and rebuild `CHANGELOG.md`; the site updates only when `bun run deploy` runs — pushing to GitHub deploys nothing.
