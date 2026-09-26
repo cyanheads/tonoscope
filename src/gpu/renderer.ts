@@ -51,6 +51,8 @@ export interface RenderStep {
   readonly tint: readonly [number, number, number, number];
   readonly fogNear: number;
   readonly fogFar: number;
+  /** Scales every grain's brightness; dips while grains are packed together in flight. */
+  readonly intensity: number;
   readonly look: Look;
 }
 
@@ -307,7 +309,7 @@ export class Renderer {
     if (!hdrView || !compositeGroup) throw new Error('Renderer.resize() must run before encode()');
     const look = step.look;
     const density = this.pixelCount / this.particles.count;
-    const grain = look.grainGain * density * (1 - look.trail);
+    const grain = look.grainGain * density * (1 - look.trail) * step.intensity;
 
     const v = this.viewData;
     v.set(step.viewProj, 0);

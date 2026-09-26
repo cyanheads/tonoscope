@@ -52,6 +52,11 @@ const FAILURE_TEXT: Record<GpuFailure, string> = {
 
 const clock = (): number => performance.now() / 1000;
 
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
 function requestedGrains(maxGrains: number): number {
   const param = new URLSearchParams(location.search).get('grains');
   const coarse = window.matchMedia('(pointer: coarse)').matches;
@@ -451,6 +456,7 @@ async function boot(): Promise<void> {
       tint,
       fogNear: camera.range - 1.1,
       fogFar: camera.range + 2.4,
+      intensity: 0.4 + 0.6 * smoothstep(0.55, 1, morph),
       look: DEFAULT_LOOK,
     });
     device.queue.submit([encoder.finish()]);

@@ -220,7 +220,7 @@ fn simulate(@builtin(global_invocation_id) gid: vec3u) {
     v += ((destination - p) * pull - v * 3.2 + flow(p * 1.3, time) * 1.1 * (1.0 - flight)) * dt;
     p += v * dt;
     p = mix(p, destination, smoothstep(0.8, 1.0, flight) * 0.25);
-    energy = mix(energy, 0.55, 0.05);
+    energy *= 0.9;
     positions[i] = vec4f(p, seed);
     velocities[i] = vec4f(v, energy);
     return;
