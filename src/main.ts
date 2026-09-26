@@ -115,6 +115,8 @@ async function boot(): Promise<void> {
   let wayRequest = 0;
   /** When the vessel last changed, until its grains land. */
   let switchedAt: number | null = null;
+  /** Set when the GPU device is lost: the frame loop stops and the instrument falls silent. */
+  let lost = false;
 
   const instrument = new Instrument();
   const composer = new Composer();
@@ -143,9 +145,12 @@ async function boot(): Promise<void> {
     console.error(`[tonoscope] GPU error: ${(event as GPUUncapturedErrorEvent).error.message}`);
   });
   device.lost.then((info) => {
-    if (info.reason !== 'destroyed') {
-      hud.showUnsupported('The graphics device was lost.', true);
-    }
+    if (info.reason === 'destroyed') return;
+    lost = true;
+    if (way === 'sing') void setWay('play');
+    instrument.releaseAll(clock());
+    audio?.sleep();
+    hud.showUnsupported('The graphics device was lost.', true);
   });
 
   const { tables, vessels } = buildResonance();
@@ -202,7 +207,7 @@ async function boot(): Promise<void> {
 
   /** Restart the audio clock where it should run: with sound on, or while singing (pitch needs it). */
   function wakeAudio(): void {
-    if (soundOn || way === 'sing') audio?.wake();
+    if (!lost && (soundOn || way === 'sing')) audio?.wake();
   }
 
   function begin(withSound: boolean): void {
@@ -484,6 +489,7 @@ async function boot(): Promise<void> {
   }
 
   function tick(): void {
+    if (lost) return;
     const now = clock();
     const dt = Math.min(now - last, 1 / 20);
     last = now;
