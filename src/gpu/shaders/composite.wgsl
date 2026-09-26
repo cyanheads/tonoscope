@@ -64,7 +64,7 @@ fn composite(in: FullscreenOut) -> @location(0) vec4f {
   color = 1.0 - exp(-color * C.tone.x);
   let grey = dot(color, vec3f(0.2126, 0.7152, 0.0722));
   color = mix(vec3f(grey), color, C.look.w);
-  color *= mix(1.0, smoothstep(1.35, 0.15, sqrt(r2)), C.look.x);
+  color *= mix(1.0, 1.0 - smoothstep(0.15, 1.35, sqrt(r2)), C.look.x);
 
   var srgb = toSrgb(color);
   let grain = hash(in.pos.xy + vec2f(fract(C.tone.w * 7.31) * 911.0, fract(C.tone.w * 3.17) * 577.0)) - 0.5;
