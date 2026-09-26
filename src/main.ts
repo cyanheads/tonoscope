@@ -43,7 +43,7 @@ const STIR_RADIUS = 0.24;
 
 const FAILURE_TEXT: Record<GpuFailure, string> = {
   'no-webgpu':
-    'This browser does not offer WebGPU. It runs in current Chrome, Edge and Safari, including on iPhone and iPad, and in Firefox on Windows.',
+    'This browser does not offer WebGPU. It runs in current Chrome, Edge and Safari, including on iPhone and iPad, and in Firefox on Windows and on Macs with Apple silicon.',
   'no-adapter':
     'WebGPU is present, but no graphics adapter answered. It may be switched off in the browser settings or unavailable for this graphics card.',
   'device-failed':
@@ -134,7 +134,7 @@ async function boot(): Promise<void> {
 
   const init = await initGpu(stage);
   if (!init.ok) {
-    hud.showUnsupported(FAILURE_TEXT[init.reason]);
+    hud.showUnsupported(FAILURE_TEXT[init.reason], init.reason === 'device-failed');
     console.error(`[tonoscope] WebGPU unavailable: ${init.detail}`);
     return;
   }
@@ -144,7 +144,7 @@ async function boot(): Promise<void> {
   });
   device.lost.then((info) => {
     if (info.reason !== 'destroyed') {
-      hud.showUnsupported('The graphics device was lost. Reload the page to start again.');
+      hud.showUnsupported('The graphics device was lost.', true);
     }
   });
 

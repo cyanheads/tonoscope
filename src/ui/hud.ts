@@ -6,6 +6,7 @@
  */
 
 import { keyLabel, type PitchRange } from '../instrument/index.ts';
+import { noteAt } from '../music/index.ts';
 import type { Vessel } from '../resonance/index.ts';
 import { renderFigure } from './figure-glyph.ts';
 
@@ -32,6 +33,14 @@ export interface FigureState {
   readonly hex: string;
 }
 
+/** A button in the figure strip and the state last written to it. */
+interface FigureButton {
+  readonly button: HTMLButtonElement;
+  /** The color it glows in while its note sounds; undefined while silent. */
+  tone: string | undefined;
+  latest: boolean;
+}
+
 function required<T extends Element>(root: ParentNode, selector: string): T {
   const element = root.querySelector<T>(selector);
   if (!element) throw new Error(`Missing element ${selector} in index.html`);
@@ -41,12 +50,15 @@ function required<T extends Element>(root: ParentNode, selector: string): T {
 export class Hud {
   private readonly body = document.body;
   private readonly figures = required<HTMLOListElement>(document, '.figures');
+  private readonly caption = required<HTMLParagraphElement>(document, '.caption');
   private readonly figNumber = required<HTMLSpanElement>(document, '.fig-number');
   private readonly figText = required<HTMLSpanElement>(document, '.fig-text');
   private readonly hint = required<HTMLParagraphElement>(document, '.hint');
   private readonly about = required<HTMLElement>(document, '.about');
   private readonly glyphCache = new Map<string, string>();
-  private figureButtons = new Map<number, HTMLButtonElement>();
+  private figureButtons = new Map<number, FigureButton>();
+  /** The control that opened the about panel, which gets focus back when it closes. */
+  private aboutOpener: HTMLElement | undefined;
   private hintTimer = 0;
   private stripKey = '';
   private readonly handlers: HudHandlers;
@@ -56,6 +68,15 @@ export class Hud {
     document.addEventListener('click', this.onClick);
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') this.toggleAbout(false);
+    });
+    // iPhone Safari has no element Fullscreen API, so the button would only throw there.
+    const fullscreen = required<HTMLButtonElement>(document, '[data-action="fullscreen"]');
+    fullscreen.hidden = !document.fullscreenEnabled;
+    document.addEventListener('fullscreenchange', () => {
+      fullscreen.setAttribute(
+        'aria-label',
+        document.fullscreenElement ? 'Leave full screen' : 'Full screen',
+      );
     });
   }
 
@@ -67,16 +88,27 @@ export class Hud {
     return !this.about.hidden;
   }
 
-  toggleAbout(force?: boolean): void {
-    const open = force ?? this.about.hidden;
+  /**
+   * Open or close the about panel. Opening moves focus to its close button; closing hands focus
+   * back to the control that opened it.
+   */
+  toggleAbout(open: boolean, opener?: HTMLElement): void {
     this.about.hidden = !open;
-    if (open) required<HTMLButtonElement>(this.about, '.close').focus();
+    if (open) {
+      this.aboutOpener = opener;
+      required<HTMLButtonElement>(this.about, '.close').focus();
+    } else {
+      this.aboutOpener?.focus();
+      this.aboutOpener = undefined;
+    }
   }
 
   setWay(way: Way): void {
     for (const button of document.querySelectorAll<HTMLButtonElement>('[data-way]')) {
       button.setAttribute('aria-pressed', String(button.dataset.way === way));
     }
+    // Listen and Sing change the caption many times a bar; only notes played by hand are announced.
+    this.caption.setAttribute('aria-live', way === 'play' ? 'polite' : 'off');
   }
 
   setVessel(index: number): void {
@@ -87,8 +119,7 @@ export class Hud {
 
   setSound(on: boolean): void {
     const button = required<HTMLButtonElement>(document, '[data-action="sound"]');
-    button.setAttribute('aria-pressed', String(!on));
-    button.setAttribute('aria-label', on ? 'Turn sound off' : 'Turn sound on');
+    button.setAttribute('aria-pressed', String(on));
   }
 
   setNoteColor(hex: string): void {
@@ -108,12 +139,12 @@ export class Hud {
     this.figText.replaceChildren(pitch, document.createTextNode(`: ${parts.text}.`));
   }
 
-  /** Rebuild the figure strip when the vessel or the playable range changes. */
+  /** Rebuild the figure strip when the vessel, the playable range or the pixel density changes. */
   showFigures(vessel: Vessel, tables: Float32Array, range: PitchRange): void {
-    const key = `${vessel.index}:${range.low}-${range.high}`;
+    const size = Math.round(40 * Math.min(2, window.devicePixelRatio || 1));
+    const key = `${vessel.index}:${range.low}-${range.high}:${size}`;
     if (key === this.stripKey) return;
     this.stripKey = key;
-    const size = Math.round(40 * Math.min(2, window.devicePixelRatio || 1));
     this.figureButtons = new Map();
     const items: HTMLLIElement[] = [];
     for (let degree = range.low; degree <= range.high; degree += 1) {
@@ -130,7 +161,8 @@ export class Hud {
       button.type = 'button';
       button.className = 'figure';
       button.dataset.degree = String(degree);
-      button.setAttribute('aria-label', `Play figure ${degree + 1}`);
+      const note = noteAt(degree);
+      button.setAttribute('aria-label', `Figure ${degree + 1}, ${note.name}${note.octave}`);
       const glyph = document.createElement('span');
       glyph.className = 'glyph';
       glyph.style.maskImage = `url(${url})`;
@@ -141,19 +173,27 @@ export class Hud {
       button.append(glyph, label);
       li.append(button);
       items.push(li);
-      this.figureButtons.set(degree, button);
+      this.figureButtons.set(degree, { button, tone: undefined, latest: false });
     }
     this.figures.replaceChildren(...items);
   }
 
-  /** Light the figures of sounding notes in their colors. */
+  /** Light the figures of sounding notes in their colors, writing only to buttons that changed. */
   updateFigures(sounding: readonly FigureState[], latest: number | null): void {
-    const lit = new Map(sounding.filter((s) => s.amplitude > 0.06).map((s) => [s.degree, s]));
-    for (const [degree, button] of this.figureButtons) {
-      const state = lit.get(degree);
-      button.classList.toggle('sounding', state !== undefined);
-      button.classList.toggle('latest', degree === latest);
-      if (state) button.style.setProperty('--tone', state.hex);
+    const lit = new Map(sounding.filter((s) => s.amplitude > 0.06).map((s) => [s.degree, s.hex]));
+    for (const [degree, figure] of this.figureButtons) {
+      const tone = lit.get(degree);
+      if (tone !== figure.tone) {
+        // A figure falling silent keeps its --tone, so the color fades out rather than snapping.
+        if (tone) figure.button.style.setProperty('--tone', tone);
+        figure.button.classList.toggle('sounding', tone !== undefined);
+        figure.tone = tone;
+      }
+      const isLatest = degree === latest;
+      if (isLatest !== figure.latest) {
+        figure.button.classList.toggle('latest', isLatest);
+        figure.latest = isLatest;
+      }
     }
   }
 
@@ -174,10 +214,12 @@ export class Hud {
     }, 1000);
   }
 
-  showUnsupported(reason: string): void {
+  /** Replace the title page with why the figures cannot be drawn, and a reload if it may help. */
+  showUnsupported(reason: string, offerReload: boolean): void {
     required<HTMLElement>(document, '.title-page').hidden = true;
     const panel = required<HTMLElement>(document, '.unsupported');
     required<HTMLElement>(panel, '[data-slot="reason"]').textContent = reason;
+    required<HTMLElement>(panel, '.begin').hidden = !offerReload;
     panel.hidden = false;
   }
 
@@ -207,7 +249,10 @@ export class Hud {
         else void document.documentElement.requestFullscreen();
         return;
       case 'about':
-        this.toggleAbout();
+        this.toggleAbout(!this.aboutOpen, control);
+        return;
+      case 'reload':
+        location.reload();
         return;
     }
     if (way === 'play' || way === 'listen' || way === 'sing') this.handlers.onWay(way);

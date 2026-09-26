@@ -226,12 +226,15 @@ body::after {
   fill: currentColor;
 }
 
-[data-action="sound"] .off,
-[data-action="sound"][aria-pressed="true"] .on {
+[data-action="sound"] .on,
+[data-action="sound"][aria-pressed="true"] .off,
+[data-action="fullscreen"] .leave,
+:root:fullscreen [data-action="fullscreen"] .enter {
   display: none;
 }
 
-[data-action="sound"][aria-pressed="true"] .off {
+[data-action="sound"][aria-pressed="true"] .on,
+:root:fullscreen [data-action="fullscreen"] .leave {
   display: inline;
 }
 
@@ -253,6 +256,11 @@ body::after {
     rgb(3 4 7 / 0.35) 55%,
     transparent 80%
   );
+  /* A halo of the field around each letter keeps the copy legible where nodal lines cross it. */
+  text-shadow:
+    0 0 3px var(--field),
+    0 0 10px var(--field),
+    0 0 22px var(--field);
   transition:
     opacity 1.4s var(--ease),
     visibility 0s linear 1.4s;
@@ -295,6 +303,7 @@ body::after {
   font-size: 19px;
   font-style: italic;
   color: var(--ink-dim);
+  text-shadow: inherit;
   padding: 10px 2px;
   transition: color 0.3s var(--ease);
 }
@@ -330,6 +339,14 @@ body.started .title-page {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+}
+
+/* Without scripting the buttons do nothing; the noscript line stands in their place. */
+@media (scripting: none) {
+  .title-page .begin,
+  .title-page .aside {
+    display: none;
+  }
 }
 
 /* ─── Hint ─────────────────────────────────────────────────────────────── */

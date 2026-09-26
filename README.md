@@ -64,7 +64,7 @@ A vibrating surface never moves all at once. It splits into regions swinging in 
 
 ## Getting started
 
-Play it at **https://tonoscope.caseyjhand.com** in a browser with WebGPU: current Chrome, Edge or Safari (macOS and iOS 26+), or Firefox on Windows.
+Play it at **https://tonoscope.caseyjhand.com** in a browser with WebGPU: current Chrome, Edge or Safari (macOS, iOS and iPadOS 26+), or Firefox on Windows and Apple-silicon Macs.
 
 To run it locally:
 

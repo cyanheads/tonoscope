@@ -10,6 +10,22 @@
     />
     <meta name="theme-color" content="#030407" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href="https://tonoscope.caseyjhand.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://tonoscope.caseyjhand.com/" />
+    <meta property="og:title" content="Tonoscope" />
+    <meta
+      property="og:description"
+      content="Play or sing a note and millions of WebGPU grains settle into its standing-wave figure, like sand on a Chladni plate."
+    />
+    <meta property="og:image" content="https://tonoscope.caseyjhand.com/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="The Tonoscope title page, set in IM Fell over a tilted square plate whose nodal lines glow on a dark field."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <canvas id="stage" aria-label="Particles settling into the figure of the current note"></canvas>
@@ -22,7 +38,7 @@
         <button type="button" data-way="sing" title="Sing or hum into your microphone">Sing</button>
       </nav>
       <div class="utilities">
-        <button type="button" class="icon" data-action="sound" aria-label="Sound off" aria-pressed="false">
+        <button type="button" class="icon" data-action="sound" aria-label="Sound" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
             <path class="on" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11" />
@@ -37,7 +53,8 @@
         </button>
         <button type="button" class="icon" data-action="fullscreen" aria-label="Full screen">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4.5 9V4.5H9M15 4.5h4.5V9M19.5 15v4.5H15M9 19.5H4.5V15" />
+            <path class="enter" d="M4.5 9V4.5H9M15 4.5h4.5V9M19.5 15v4.5H15M9 19.5H4.5V15" />
+            <path class="leave" d="M9 4.5V9H4.5M15 4.5V9h4.5M19.5 15H15v4.5M4.5 15H9v4.5" />
           </svg>
         </button>
         <a class="icon" href="https://github.com/cyanheads/tonoscope" target="_blank" rel="noopener">
@@ -69,6 +86,7 @@
         <button type="button" class="primary" data-action="begin-sound">Begin, with sound</button>
         <button type="button" data-action="begin-silent">Watch in silence</button>
       </div>
+      <noscript><p class="lede">Tonoscope needs JavaScript and WebGPU to draw its figures.</p></noscript>
       <p class="aside">Headphones bring out the low notes.</p>
     </section>
 
@@ -76,6 +94,9 @@
       <h1>Tonoscope</h1>
       <p class="subtitle">needs WebGPU to draw its figures.</p>
       <p class="lede" data-slot="reason"></p>
+      <div class="begin" hidden>
+        <button type="button" data-action="reload">Reload the page</button>
+      </div>
     </section>
 
     <p class="hint" aria-live="polite" hidden></p>
