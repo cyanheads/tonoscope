@@ -1,0 +1,15 @@
+/**
+ * Cloudflare Workers static-assets deploy: `bun run deploy` uploads `dist/`.
+ * No Worker script; `public/_headers` sets the security and cache headers.
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tonoscope",
+  "compatibility_date": "2026-09-25",
+  "assets": {
+    "directory": "./dist"
+  },
+  "routes": [{ "pattern": "tonoscope.caseyjhand.com", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false
+}

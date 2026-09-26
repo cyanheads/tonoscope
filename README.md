@@ -61,7 +61,9 @@ A vibrating surface never moves all at once. It splits into regions swinging in 
 
 ## Getting started
 
-Requires a browser with WebGPU: current Chrome, Edge or Safari (macOS and iOS 26+), or Firefox on Windows.
+Play it at **https://tonoscope.caseyjhand.com** in a browser with WebGPU: current Chrome, Edge or Safari (macOS and iOS 26+), or Firefox on Windows.
+
+To run it locally:
 
 ```sh
 git clone https://github.com/cyanheads/tonoscope.git
@@ -89,6 +91,7 @@ No environment variables. One URL parameter:
 | `bun run preview` | Serves `dist/` on port 5199 |
 | `bun run check` | Typecheck, Biome lint, Vitest, changelog sync — the gate |
 | `bun run snapshot` | Headless-Chrome stills of each resonator into `stills/` (needs `bun run dev` running) |
+| `bun run deploy` | Runs the gate, builds, and uploads `dist/` to Cloudflare Workers at tonoscope.caseyjhand.com (needs `CLOUDFLARE_API_TOKEN` with Workers Scripts edit) |
 
 ## Project structure
 
@@ -102,6 +105,8 @@ No environment variables. One URL parameter:
 | `src/instrument/` | Note lifecycle, pointer and keyboard input, key layout |
 | `src/view/` | Orbit camera and matrix math |
 | `src/ui/` | Page chrome: title page, captions, figure strip, about panel, styles |
+| `public/_headers` | Security and cache headers served with every file (CSP, permissions, HSTS) |
+| `wrangler.jsonc` | Cloudflare Workers static-assets config and the custom domain |
 | `tests/` | Vitest suites mirroring `src/` |
 | `scripts/` | Changelog builder, snapshot tool |
 | `docs/design.md` | How a note becomes a figure, and the decisions behind it |

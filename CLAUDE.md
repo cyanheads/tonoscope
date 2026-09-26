@@ -1,6 +1,6 @@
 # tonoscope
 
-A browser instrument that makes sound visible: each note excites a standing-wave mode of one of four resonators (plate, drum, sphere, lattice), and ~4 M WebGPU grains settle into its figure while a synthesized glass voice rings. Static Vite + TypeScript site, no backend.
+A browser instrument that makes sound visible: each note excites a standing-wave mode of one of four resonators (plate, drum, sphere, lattice), and ~4 M WebGPU grains settle into its figure while a synthesized glass voice rings. Static Vite + TypeScript site, no backend, live at https://tonoscope.caseyjhand.com (Cloudflare Workers static assets).
 
 **Orientation:** this file is the behavioral layer; `README.md` has the surface and structure, `docs/design.md` the physics, frame flow and recorded decisions.
 
@@ -16,6 +16,8 @@ Bun, Vite 8, TypeScript 7 (strict, `erasableSyntaxOnly` — no parameter propert
 |:---|:---|:---|
 | Dev | `bun run dev` | http://127.0.0.1:5199, hot reload (WGSL edits reload too) |
 | Build | `bun run build` → `dist/` | Fully static; deployable anywhere |
+| Deploy | `bun run deploy` | Gate, build, then `wrangler deploy` of `dist/` as an assets-only Worker on the `tonoscope.caseyjhand.com` custom domain (`wrangler.jsonc`). Uses `CLOUDFLARE_API_TOKEN` from the shell; the token needs Account → Workers Scripts: Edit |
+| Prod-like local | `bunx wrangler dev --port 8799` | Serves `dist/` with `public/_headers` applied — the way to test CSP changes before deploying |
 | Stills | `bun run snapshot [--scenes "0:9,2:14+17"] [--width 390 --height 844] [--about]` | Headless Chrome with WebGPU over CDP; dev server must be running; writes `stills/` |
 
 Debug handle in the page: `window.tonoscope` (`particles.sample(n)` reads grains back from the GPU, `instrument.noteOn(...)`, `setVessel(i)`, `vessels`, `tables`, `evaluateRawMode`). GPU validation errors log as `[tonoscope] GPU error:`.
@@ -43,6 +45,7 @@ Input or composer → `Instrument` notes → `packSlots` (≤ 8 slots) → `simu
 - **Degree order = complexity order** in every vessel; tests enforce ascending plate wavenumber. Adding a mode means keeping that property.
 - **Copy is sentence case, plain, treatise-flavored.** No all-caps labels; figure captions read `Fig. N. <pitch>: <mode description>.` Run a `writing-humanizer` pass on substantial copy changes.
 - **The interface stays colorless** except `--note`, which follows the last note's Scriabin color.
+- **The CSP in `public/_headers` is strict** (same-origin only plus Cloudflare Web Analytics, `data:` images for the figure-strip masks, no inline script or style). One console CSP error on the live site is expected: Cloudflare's injected JavaScript Detections inline script, deliberately left blocked (see `docs/design.md`). A new external resource, inline `<style>`/`style=` markup, `innerHTML`, a worker or AudioWorklet from a blob, or WASM each needs a matching CSP change — verify under `wrangler dev` with no violations in the console.
 
 ## Where things live
 
@@ -60,8 +63,8 @@ Input or composer → `Instrument` notes → `packSlots` (≤ 8 slots) → `simu
 | "grains feel sluggish / too jumpy" | `DEFAULT_PHYSICS` in `src/gpu/particle-system.ts`; onset jolt in `Instrument.agitation` |
 | "change the scale / key" | `src/music/scale.ts` (`LYDIAN_STEPS`, `TONIC_MIDI`), composer progression, key-map tests |
 | "take screenshots", "show me" | `bun run dev` then `bun run snapshot` |
-| "deploy it" | Not wired yet — `bun run build` produces a static `dist/`; ask where it should go |
+| "deploy it", "ship it live", "push to the site" | `bun run deploy`, then verify https://tonoscope.caseyjhand.com returns the new asset hashes and run `bun run snapshot --url https://tonoscope.caseyjhand.com/` (headless reaches it because a zone WAF rule skips bot protection for this host; without it, headless gets a Cloudflare challenge page) |
 
 ## Commit stance
 
-Private, Claude-maintained repo: commit and push verified work as it lands once `bun run check` is green. Versioned releases add a `changelog/` entry and rebuild `CHANGELOG.md`; no publish step.
+Private, Claude-maintained repo: commit and push verified work as it lands once `bun run check` is green. Versioned releases add a `changelog/` entry and rebuild `CHANGELOG.md`; the site updates only when `bun run deploy` runs — pushing to GitHub deploys nothing.
