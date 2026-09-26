@@ -7,7 +7,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.1.0-ece3cf?style=flat-square)](./CHANGELOG.md) [![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![WebGPU](https://img.shields.io/badge/WebGPU-WGSL-005A9C?style=flat-square)](https://www.w3.org/TR/webgpu/) [![Bun](https://img.shields.io/badge/Bun-1.3-000000?style=flat-square&logo=bun&logoColor=white)](https://bun.sh/)
+[![Version](https://img.shields.io/badge/version-0.1.1-ece3cf?style=flat-square)](./CHANGELOG.md) [![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![WebGPU](https://img.shields.io/badge/WebGPU-WGSL-005A9C?style=flat-square)](https://www.w3.org/TR/webgpu/) [![Bun](https://img.shields.io/badge/Bun-1.3-000000?style=flat-square&logo=bun&logoColor=white)](https://bun.sh/)
 
 </div>
 
