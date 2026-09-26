@@ -1,0 +1,60 @@
+{
+  "name": "tonoscope",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Play or sing a note and millions of WebGPU grains settle into its standing-wave figure, like sand on a Chladni plate.",
+  "keywords": [
+    "cymatics",
+    "chladni",
+    "chladni-figures",
+    "standing-waves",
+    "webgpu",
+    "wgsl",
+    "particles",
+    "generative-art",
+    "web-audio",
+    "music-visualization",
+    "synesthesia",
+    "creative-coding",
+    "typescript",
+    "cyanheads"
+  ],
+  "author": "Casey Hand <casey@caseyjhand.com> (https://caseyjhand.com)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cyanheads/tonoscope.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cyanheads/tonoscope/issues"
+  },
+  "homepage": "https://github.com/cyanheads/tonoscope#readme",
+  "engines": {
+    "bun": ">=1.3",
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run",
+    "snapshot": "bun run scripts/snapshot.ts",
+    "check": "bun run typecheck && bun run lint && bun run test && bun run changelog:check",
+    "changelog:build": "bun run scripts/build-changelog.ts",
+    "changelog:check": "bun run scripts/build-changelog.ts --check"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@types/bun": "^1.4.2",
+    "@webgpu/types": "^0.1.74",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  },
+  "dependencies": {
+    "@fontsource/im-fell-english": "^5.3.0"
+  }
+}

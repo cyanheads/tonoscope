@@ -1,0 +1,664 @@
+/*
+ * Tonoscope — the interface is marginalia on a living figure: parchment ink on a dark field,
+ * set in IM Fell, with color arriving only from the notes (--note follows the last one played).
+ */
+
+:root {
+  --field: #030407;
+  --ink: #ece3cf;
+  --ink-dim: rgb(236 227 207 / 0.66);
+  --ink-faint: rgb(236 227 207 / 0.34);
+  --rule: rgb(236 227 207 / 0.16);
+  --note: #ece3cf;
+  --serif: "IM Fell English", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --gutter: clamp(16px, 2.4vw, 32px);
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  /* biome-ignore lint/complexity/noImportantStyles: `hidden` must win over any component display. */
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--field);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-variant-numeric: oldstyle-nums;
+}
+
+body {
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+a {
+  color: inherit;
+  text-decoration-color: var(--ink-faint);
+  text-underline-offset: 3px;
+}
+
+svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ─── Masthead ─────────────────────────────────────────────────────────── */
+
+/* Soft falloffs so the marginalia stay legible over bright figures. */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  transition: opacity 1.6s var(--ease) 0.4s;
+}
+
+body::before {
+  top: 0;
+  height: 140px;
+  background: linear-gradient(rgb(3 4 7 / 0.55), transparent);
+}
+
+body::after {
+  bottom: 0;
+  height: 190px;
+  background: linear-gradient(transparent, rgb(3 4 7 / 0.7));
+}
+
+body:not(.started)::before,
+body:not(.started)::after {
+  opacity: 0;
+}
+
+#stage {
+  z-index: 0;
+}
+
+body::before,
+body::after {
+  z-index: 1;
+}
+
+.masthead,
+.plate,
+.title-page,
+.unsupported,
+.hint,
+.about {
+  z-index: 2;
+}
+
+.masthead {
+  position: fixed;
+  inset: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: calc(var(--gutter) * 0.8) var(--gutter);
+  padding-top: max(calc(var(--gutter) * 0.8), env(safe-area-inset-top));
+  pointer-events: none;
+}
+
+.masthead > * {
+  pointer-events: auto;
+}
+
+.wordmark {
+  font-size: 23px;
+  letter-spacing: 0.01em;
+  margin-right: auto;
+}
+
+.ways {
+  display: flex;
+  gap: 22px;
+  font-style: italic;
+  font-size: 18px;
+}
+
+.ways button {
+  position: relative;
+  color: var(--ink-dim);
+  padding: 4px 0;
+  transition: color 0.3s var(--ease);
+}
+
+.ways button:hover {
+  color: var(--ink);
+}
+
+.ways button[aria-pressed="true"] {
+  color: var(--ink);
+}
+
+.ways button::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--note);
+  transform: scaleX(0);
+  transition:
+    transform 0.4s var(--ease),
+    background-color 0.6s var(--ease);
+}
+
+.ways button[aria-pressed="true"]::after {
+  transform: scaleX(1);
+}
+
+.utilities {
+  display: flex;
+  gap: 6px;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--ink-dim);
+  border-radius: 50%;
+  transition: color 0.25s var(--ease);
+}
+
+.icon:hover {
+  color: var(--ink);
+}
+
+.icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.icon .dot {
+  fill: currentColor;
+}
+
+[data-action="sound"] .off,
+[data-action="sound"][aria-pressed="true"] .on {
+  display: none;
+}
+
+[data-action="sound"][aria-pressed="true"] .off {
+  display: inline;
+}
+
+/* ─── Title page ───────────────────────────────────────────────────────── */
+
+.title-page,
+.unsupported {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--gutter);
+  background: radial-gradient(
+    ellipse 70% 60% at 50% 48%,
+    rgb(3 4 7 / 0.72),
+    rgb(3 4 7 / 0.35) 55%,
+    transparent 80%
+  );
+  transition:
+    opacity 1.4s var(--ease),
+    visibility 0s linear 1.4s;
+}
+
+.title-page h1,
+.unsupported h1 {
+  margin: 0;
+  font-weight: 400;
+  font-size: clamp(64px, 11vw, 150px);
+  line-height: 0.92;
+  letter-spacing: -0.012em;
+}
+
+.subtitle {
+  margin: 0.35em 0 0;
+  font-style: italic;
+  font-size: clamp(20px, 2.2vw, 27px);
+  color: var(--ink-dim);
+}
+
+.lede {
+  max-width: 30em;
+  margin: 1.6em 0 0;
+  font-size: clamp(17px, 1.35vw, 19px);
+  line-height: 1.62;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.begin {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px 30px;
+  margin-top: 2.2em;
+}
+
+.begin button {
+  font-size: 19px;
+  font-style: italic;
+  color: var(--ink-dim);
+  padding: 10px 2px;
+  transition: color 0.3s var(--ease);
+}
+
+.begin button:hover {
+  color: var(--ink);
+}
+
+.begin .primary {
+  font-style: normal;
+  color: var(--ink);
+  padding: 10px 26px;
+  border: 1px solid var(--ink-faint);
+  border-radius: 999px;
+  transition:
+    border-color 0.3s var(--ease),
+    background-color 0.3s var(--ease);
+}
+
+.begin .primary:hover {
+  border-color: var(--ink);
+  background: rgb(236 227 207 / 0.06);
+}
+
+.aside {
+  margin: 1.4em 0 0;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink-faint);
+}
+
+body.started .title-page {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ─── Hint ─────────────────────────────────────────────────────────────── */
+
+.hint {
+  position: fixed;
+  left: 50%;
+  top: 22%;
+  transform: translateX(-50%);
+  margin: 0;
+  max-width: min(34em, calc(100vw - 2 * var(--gutter)));
+  text-align: center;
+  font-style: italic;
+  font-size: 18px;
+  color: var(--ink-dim);
+  pointer-events: none;
+  transition: opacity 1s var(--ease);
+}
+
+.hint.fading {
+  opacity: 0;
+}
+
+/* ─── The plate: caption, vessels, figures ─────────────────────────────── */
+
+.plate {
+  position: fixed;
+  inset: auto 0 0;
+  padding: 0 var(--gutter) max(calc(var(--gutter) * 0.7), env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+/* The masthead and plate wait for the title page to leave. */
+.masthead,
+.plate {
+  transition:
+    opacity 1.6s var(--ease) 0.4s,
+    visibility 0s;
+}
+
+body:not(.started) .masthead,
+body:not(.started) .plate {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.plate > * {
+  pointer-events: auto;
+}
+
+.plate-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.caption {
+  margin: 0;
+  min-height: 1.5em;
+  font-size: 18px;
+  color: var(--ink);
+  pointer-events: none;
+}
+
+.fig-number {
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+  margin-right: 0.35em;
+}
+
+.fig-text {
+  font-style: italic;
+  color: var(--ink-dim);
+}
+
+.fig-text .pitch {
+  color: var(--note);
+  font-style: normal;
+  transition: color 0.4s var(--ease);
+}
+
+.vessels {
+  display: flex;
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+.vessels button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-faint);
+  font-size: 17px;
+  padding: 4px 0;
+  transition: color 0.3s var(--ease);
+}
+
+.vessels button:hover {
+  color: var(--ink-dim);
+}
+
+.vessels button[aria-pressed="true"] {
+  color: var(--ink);
+}
+
+.vessels svg {
+  width: 19px;
+  height: 19px;
+}
+
+.figures {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 12px 0 0;
+}
+
+.figures li {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.figure {
+  --glow: transparent;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 4px 0 2px;
+  color: var(--ink-faint);
+  transition: color 0.5s var(--ease);
+}
+
+.figure:hover {
+  color: var(--ink-dim);
+}
+
+.glyph {
+  display: block;
+  width: clamp(22px, 2.6vw, 38px);
+  aspect-ratio: 1;
+  background-color: currentColor;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  filter: drop-shadow(0 0 0 var(--glow));
+  transition: filter 0.5s var(--ease);
+}
+
+.key {
+  font-size: 12px;
+  line-height: 1;
+  font-variant: small-caps;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.figure.sounding {
+  color: var(--tone);
+  --glow: var(--tone);
+  transition-duration: 0.06s;
+}
+
+.figure.sounding .glyph {
+  filter: drop-shadow(0 0 5px var(--glow));
+  transition-duration: 0.06s;
+}
+
+.figure.latest:not(.sounding) {
+  color: var(--ink-dim);
+}
+
+/* ─── About ────────────────────────────────────────────────────────────── */
+
+.about {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(30rem, 100vw);
+  overflow-y: auto;
+  padding: 72px 36px 48px;
+  background: rgb(5 6 10 / 0.84);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  border-left: 1px solid var(--rule);
+  -webkit-user-select: text;
+  user-select: text;
+  animation: slide-in 0.6s var(--ease);
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+.about .close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
+
+.about h2 {
+  margin: 0 0 0.8em;
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.15;
+}
+
+.about h3 {
+  margin: 1.8em 0 0.5em;
+  font-weight: 400;
+  font-style: italic;
+  font-size: 20px;
+}
+
+.about p {
+  margin: 0 0 1em;
+  line-height: 1.65;
+  color: var(--ink-dim);
+}
+
+.about dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 18px;
+  color: var(--ink-dim);
+}
+
+.about dt {
+  color: var(--ink);
+}
+
+.about dd {
+  margin: 0;
+}
+
+.about .keys {
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+
+.about .keys dd {
+  margin-bottom: 10px;
+}
+
+.about .colophon {
+  margin-top: 2.4em;
+  padding-top: 1.2em;
+  border-top: 1px solid var(--rule);
+  font-style: italic;
+  font-size: 15px;
+}
+
+/* ─── Small screens ────────────────────────────────────────────────────── */
+
+@media (max-width: 760px) {
+  html,
+  body {
+    font-size: 16px;
+  }
+
+  .masthead {
+    gap: 14px;
+  }
+
+  .wordmark {
+    font-size: 20px;
+  }
+
+  .ways {
+    gap: 14px;
+    font-size: 16px;
+  }
+
+  .utilities [data-action="fullscreen"],
+  .utilities [data-action="capture"] {
+    display: none;
+  }
+
+  .plate-head {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .caption {
+    font-size: 15px;
+  }
+
+  .vessels {
+    justify-content: space-between;
+  }
+
+  .vessels span {
+    font-size: 15px;
+  }
+
+  .key {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .wordmark {
+    display: none;
+  }
+
+  .ways {
+    margin-right: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: the motion preference outranks every component. */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: the motion preference outranks every component. */
+    transition-duration: 0.01ms !important;
+  }
+}
