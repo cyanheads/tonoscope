@@ -1,6 +1,6 @@
 {
   "name": "tonoscope",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "description": "Play or sing a note and millions of WebGPU grains settle into its standing-wave figure, like sand on a Chladni plate.",
